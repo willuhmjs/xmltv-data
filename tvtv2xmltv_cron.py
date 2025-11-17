@@ -3,9 +3,10 @@
 import sys
 import requests
 import math
+import json
 from datetime import datetime, timedelta
 from xml.sax.saxutils import escape
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError # Requires Python 3.9+
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # Requires Python 3.9+
 
 # --- Configuration ---
 TIMEZONE = "America/New_York"  # Set to your local timezone
@@ -27,6 +28,14 @@ def get_json_data(url):
         print(f"Error decoding JSON from {url}: {e}", file=sys.stderr)
         return None
 
+def write_file_utf8(file_path, lines):
+    """Write lines to file in UTF-8 encoding, safely."""
+    try:
+        with open(file_path, 'wb') as f:
+            f.write("\n".join(lines).encode('utf-8'))
+    except IOError as e:
+        print(f"Error writing file {file_path}: {e}", file=sys.stderr)
+
 def main():
     """Main function to generate the XMLTV guide."""
     
@@ -36,10 +45,9 @@ def main():
         print(f"Error: Timezone '{TIMEZONE}' not found.", file=sys.stderr)
         sys.exit(1)
 
-    # --- We will write the output to a list of strings first ---
     output_lines = []
 
-    # --- Build XMLTV data ---
+    # --- Build XMLTV header ---
     source_url = "https://www.tvtv.us" 
     now_utc = datetime.now(ZoneInfo("UTC"))
     start_time_str = now_utc.strftime('%Y-%m-%dT00:00:00.000Z')
@@ -55,12 +63,7 @@ def main():
     if not lineup_data:
         output_lines.append("</tv>")
         print("Failed to fetch lineup data. Exiting.", file=sys.stderr)
-        # Still write the partial file so the server has *something*
-        try:
-            with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-                f.write("\n".join(output_lines))
-        except IOError as e:
-            print(f"Error writing partial file: {e}", file=sys.stderr)
+        write_file_utf8(OUTPUT_FILE, output_lines)
         sys.exit(1)
 
     all_channels = []
@@ -101,6 +104,22 @@ def main():
             batch_data = get_json_data(listing_url)
             if batch_data:
                 listing_data.extend(batch_data)
+                # --- Debug: print what we grabbed for this batch ---
+                try:
+                    print(f"    Batch fetched: {len(batch_data)} channel entries", file=sys.stderr)
+                    for j, ch_programs in enumerate(batch_data):
+                        ch_id = channels_batch[j] if j < len(channels_batch) else j
+                        if isinstance(ch_programs, list) and ch_programs:
+                            try:
+                                first_title = ch_programs[0].get('title', '') if isinstance(ch_programs[0], dict) else str(ch_programs[0])
+                            except Exception:
+                                first_title = str(ch_programs[0])
+                            print(f"      Channel {ch_id}: {len(ch_programs)} programs, first: {first_title}", file=sys.stderr)
+                        else:
+                            print(f"      Channel {ch_id}: 0 programs", file=sys.stderr)
+                except Exception as e:
+                    # If debug printing fails, don't stop main processing
+                    print(f"Error printing batch debug info: {e}", file=sys.stderr)
 
         # --- Program Data ---
         for index, channel in enumerate(lineup_data):
@@ -148,16 +167,10 @@ def main():
                     continue
 
     output_lines.append("</tv>")
-    
-    # --- Write the final file ---
-    try:
-        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            f.write("\n".join(output_lines))
-        print(f"Successfully wrote guide to {OUTPUT_FILE}", file=sys.stderr)
-    except IOError as e:
-        print(f"Error writing to output file {OUTPUT_FILE}: {e}", file=sys.stderr)
-        sys.exit(1)
-        
+
+    # --- Write final file ---
+    write_file_utf8(OUTPUT_FILE, output_lines)
+    print(f"Successfully wrote guide to {OUTPUT_FILE}", file=sys.stderr)
     print("Done.", file=sys.stderr)
 
 if __name__ == "__main__":
