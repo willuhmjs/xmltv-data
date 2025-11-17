@@ -44,7 +44,7 @@ def main():
     now_utc = datetime.now(ZoneInfo("UTC"))
     start_time_str = now_utc.strftime('%Y-%m-%dT00:00:00.000Z')
 
-    output_lines.append('<?xml version="1.0" encoding="ISO-8859-1"?>')
+    output_lines.append('<?xml version="1.0" encoding="UTF-8"?>')
     output_lines.append(f'<tv date="{start_time_str}" source-info-url="{source_url}" source-info-name="tvtv2xmltv">')
 
     # --- GET lineup data ---
@@ -57,7 +57,7 @@ def main():
         print("Failed to fetch lineup data. Exiting.", file=sys.stderr)
         # Still write the partial file so the server has *something*
         try:
-            with open(OUTPUT_FILE, 'w', encoding='iso-8859-1') as f:
+            with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
                 f.write("\n".join(output_lines))
         except IOError as e:
             print(f"Error writing partial file: {e}", file=sys.stderr)
@@ -151,7 +151,7 @@ def main():
     
     # --- Write the final file ---
     try:
-        with open(OUTPUT_FILE, 'w', encoding='iso-8859-1') as f:
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
             f.write("\n".join(output_lines))
         print(f"Successfully wrote guide to {OUTPUT_FILE}", file=sys.stderr)
     except IOError as e:
